@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SCIBERWEAR Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    @font-face {
+      font-family: 'SFMonoMedium';
+      src: url('https://cdn.jsdelivr.net/gh/sciberwear/assets@main/SFMonoMedium.otf');
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: 'SFMonoMedium', monospace;
+      font-size: 12px;
+    }
+
+    body {
+      background: #e8e8e8;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 640px;
+      border: 1.8px solid black;
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .center-play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 180px;
+      height: 180px;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      cursor: pointer;
+      display: none;
+    }
+
+    .controls {
+      background: #dedede;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .control-btn {
+      background: #b7b7b7;
+      border: none;
+      padding: 6px 10px;
+      color: #000;
+      cursor: pointer;
+      border-radius: 0;
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      background: #000;
+      color: #fff;
+    }
+
+    .progress,
+    .sciberwear-progress {
+      flex: 1;
+      appearance: none;
+      height: 6px;
+      background: #b1b4b5;
+      border-radius: 0;
+      cursor: pointer;
+    }
+
+    .sciberwear-progress {
+      background: linear-gradient(to right, #000 0%, #000 var(--progress, 0%), #b1b4b5 var(--progress, 0%), #b1b4b5 100%);
+    }
+
+    .progress::-webkit-slider-thumb {
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #e8e8e8;
+      border: 1.7px solid black;
+      cursor: pointer;
+      border-radius: 0;
+    }
+
+    .progress::-webkit-slider-thumb:hover {
+      background: #000;
+    }
+
+    .progress::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      background: #e8e8e8;
+      border: 1.7px solid black;
+      cursor: pointer;
+      border-radius: 0;
+    }
+
+    .progress::-moz-range-thumb:hover {
+      background: #000;
+    }
+
+    .autoplay-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .toggle-track {
+      width: 41px;
+      height: 14px;
+      background: #dedede;
+      border: 1px solid #a5a5a5;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .toggle-thumb {
+      width: 16px;
+      height: 14px;
+      background: #b1b1b1;
+      position: absolute;
+      left: 2px;
+      top: 0;
+      transition: left 0.2s ease-in-out;
+    }
+
+    .toggle-track.active {
+      background: #4CAF50;
+    }
+
+    .toggle-track.active .toggle-thumb {
+      left: 23px;
+    }
+
+    .playlist {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 257px;
+      background: #e8e8e8;
+      padding: 5px;
+      border: 1.8px solid #000;
+      display: none;
+      z-index: 20;
+    }
+
+    .playlist-item {
+      padding: 5px;
+      cursor: pointer;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .playlist-item:hover {
+      background: #b1b4b5;
+    }
+
+    .video-wrapper:hover .playlist {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="video-wrapper">
+    <video id="video" poster="https://cdn.jsdelivr.net/gh/sciberwear/assets@main/thumbnail.jpg">
+      <source src="https://cdn.jsdelivr.net/gh/sciberwear/assets@main/clo3d-fashion-show-1080.mp4" type="video/mp4">
+    </video>
+
+    <!-- Center Play Logo -->
+    <img id="centerPlay" class="center-play" src="https://raw.githubusercontent.com/sciberwear/assets/refs/heads/main/play-button.svg" alt="Play Button" />
+
+    <!-- Playlist Panel -->
+    <div class="playlist">
+      <div class="playlist-item" onclick="seekTo(0)">Intro – 0:00</div>
+      <div class="playlist-item" onclick="seekTo(30)">Scene 1 – 0:30</div>
+      <div class="playlist-item" onclick="seekTo(60)">Scene 2 – 1:00</div>
+    </div>
+
+    <!-- Custom Controls -->
+    <div class="controls">
+      <button id="playPause" class="control-btn">Play</button>
+      <button id="next" class="control-btn">Next</button>
+      <input type="range" id="progress" class="progress sciberwear-progress" value="0" />
+      <div class="autoplay-toggle">
+        <span>Off</span>
+        <div id="autoplayTrack" class="toggle-track">
+          <div class="toggle-thumb"></div>
+        </div>
+        <span>On</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const playPause = document.getElementById('playPause');
+    const next = document.getElementById('next');
+    const progress = document.getElementById('progress');
+    const centerPlay = document.getElementById('centerPlay');
+    const autoplayTrack = document.getElementById('autoplayTrack');
+    const thumb = autoplayTrack.querySelector('.toggle-thumb');
+    let autoplay = false;
+
+    autoplayTrack.addEventListener('click', () => {
+      autoplay = !autoplay;
+      autoplayTrack.classList.toggle('active', autoplay);
+    });
+
+    function showCenterPlay(show) {
+      centerPlay.style.display = show ? 'block' : 'none';
+    }
+
+    centerPlay.addEventListener('click', () => {
+      video.play();
+      playPause.textContent = 'Pause';
+      showCenterPlay(false);
+    });
+
+    playPause.addEventListener('click', () => {
+      if (video.paused) {
+        video.play();
+        playPause.textContent = 'Pause';
+        showCenterPlay(false);
+      } else {
+        video.pause();
+        playPause.textContent = 'Play';
+        showCenterPlay(true);
+      }
+    });
+
+    next.addEventListener('click', () => {
+      video.currentTime += 10;
+    });
+
+    video.addEventListener('timeupdate', () => {
+      const percent = (video.currentTime / video.duration) * 100;
+      progress.value = percent;
+      progress.style.setProperty('--progress', `${percent}%`);
+    });
+
+    progress.addEventListener('input', () => {
+      video.currentTime = (progress.value / 100) * video.duration;
+    });
+
+    video.addEventListener('ended', () => {
+      if (autoplay) video.play();
+      else {
+        playPause.textContent = 'Play';
+        showCenterPlay(true);
+      }
+    });
+
+    video.addEventListener('pause', () => {
+      showCenterPlay(true);
+    });
+
+    video.addEventListener('play', () => {
+      showCenterPlay(false);
+    });
+
+    function seekTo(sec) {
+      video.currentTime = sec;
+      video.play();
+      playPause.textContent = 'Pause';
+      showCenterPlay(false);
+    }
+
+    // ✅ Show play button logo by default on page load
+    showCenterPlay(true);
+  </script>
+</body>
+</html>
