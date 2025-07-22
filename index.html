@@ -17,27 +17,27 @@
     }
 
     body {
-    margin: 0;
-    padding: 0;
-    background: none;
-    display: flex;
-    justify-content: center;
+      margin: 0;
+      padding: 0;
+      background: none;
+      display: flex;
+      justify-content: center;
     }
 
-   .video-wrapper {
-    position: relative;
-    width: 100%;
-    max-width: 640px;
-    height: auto;
-    background: none;
-    border: 1.8px solid black;
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      height: auto;
+      background: none;
+      border: 1.8px solid black;
     }
-    
+
     video {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    display: block;
-    object-fit: contain;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      object-fit: contain;
     }
 
     .center-play {
@@ -151,6 +151,18 @@
       left: 22px;
     }
 
+    .playlist,
+    .time-box,
+    .mute-btn {
+      display: none;
+    }
+
+    .playlist.active,
+    .time-box.active,
+    .mute-btn.active {
+      display: block;
+    }
+
     .playlist {
       position: absolute;
       top: 10px;
@@ -159,7 +171,6 @@
       background: #e8e8e8;
       padding: 5px;
       border: 1.8px solid #000;
-      display: none;
       z-index: 20;
     }
 
@@ -169,36 +180,62 @@
       border-bottom: 1px solid #ccc;
     }
 
-    .playlist-item:hover {
+    .playlist-item:hover,
+    .playlist-item.active {
       background: #b1b4b5;
     }
 
-    .video-wrapper:hover .playlist {
-      display: block;
+    .time-box {
+      position: absolute;
+      right: 10px;
+      bottom: 57px;
+      background: #e8e8e8;
+      border: 1.8px solid #000;
+      padding: 5px 8px;
+      font-size: 12px;
+      z-index: 10;
+    }
+
+    .mute-btn {
+      position: absolute;
+      right: 10px;
+      bottom: 90px;
+      background: #e8e8e8;
+      border: 1.8px solid #000;
+      padding: 5px 8px;
+      font-size: 12px;
+      z-index: 10;
+      color: #000;
+      cursor: pointer;
+    }
+
+    .mute-btn:hover,
+    .mute-btn.muted {
+      background: #000;
+      color: #fff;
     }
   </style>
 </head>
 <body>
-  <div class="video-wrapper">
+  <div class="video-wrapper" id="videoWrapper">
     <video id="video" poster="https://cdn.jsdelivr.net/gh/sciberwear/assets@main/thumbnail.jpg">
       <source src="https://cdn.jsdelivr.net/gh/sciberwear/assets@main/clo3d-fashion-show-1080.mp4" type="video/mp4">
     </video>
 
-    <!-- Center Play Logo -->
     <img id="centerPlay" class="center-play" src="https://raw.githubusercontent.com/sciberwear/assets/refs/heads/main/play-button.svg" alt="Play Button" />
 
-    <!-- Playlist Panel -->
     <div class="playlist">
       <div class="playlist-item" onclick="seekTo(0)">Intro – 0:00</div>
       <div class="playlist-item" onclick="seekTo(30)">Scene 1 – 0:30</div>
       <div class="playlist-item" onclick="seekTo(60)">Scene 2 – 1:00</div>
     </div>
+    <div class="time-box" id="timeBox">0:00 - 2:00</div>
+    <div class="mute-btn" id="muteBtn">Mute</div>
 
-    <!-- Custom Controls -->
     <div class="controls">
       <button id="playPause" class="control-btn">Play</button>
       <button id="next" class="control-btn">Next</button>
-      <input type="range" id="progress" class="progress sciberwear-progress" value="0" />
+      <input type="range" id="progress" class="progress sciberwear-progress" value="0" min="0" max="100" step="0.1" />
       <div class="autoplay-toggle">
         <span>Off</span>
         <div id="autoplayTrack" class="toggle-track">
@@ -211,80 +248,120 @@
 
   <script>
     const video = document.getElementById('video');
+    const wrapper = document.getElementById('videoWrapper');
+    const playlist = document.querySelector('.playlist');
+    const timeBox = document.getElementById('timeBox');
+    const muteBtn = document.getElementById('muteBtn');
     const playPause = document.getElementById('playPause');
-    const next = document.getElementById('next');
-    const progress = document.getElementById('progress');
     const centerPlay = document.getElementById('centerPlay');
+    const progress = document.getElementById('progress');
     const autoplayTrack = document.getElementById('autoplayTrack');
-    const thumb = autoplayTrack.querySelector('.toggle-thumb');
+    const playlistItems = document.querySelectorAll('.playlist-item');
+
     let autoplay = false;
+    let uiEnabled = false;
+    let uiTimer = null;
+    let videoEnded = false;
 
     autoplayTrack.addEventListener('click', () => {
       autoplay = !autoplay;
       autoplayTrack.classList.toggle('active', autoplay);
     });
 
-    function showCenterPlay(show) {
-      centerPlay.style.display = show ? 'block' : 'none';
+    muteBtn.addEventListener('click', () => {
+      video.muted = !video.muted;
+      muteBtn.textContent = video.muted ? 'Unmute' : 'Mute';
+      muteBtn.classList.toggle('muted', video.muted);
+    });
+
+    function showUIElements() {
+      if (!uiEnabled && !videoEnded) return;
+      playlist.classList.add('active');
+      timeBox.classList.add('active');
+      if (!videoEnded) muteBtn.classList.add('active');
+
+      if (!videoEnded) {
+        clearTimeout(uiTimer);
+        uiTimer = setTimeout(hideUIElements, 3500);
+      }
     }
 
-    centerPlay.addEventListener('click', () => {
-      video.play();
-      playPause.textContent = 'Pause';
-      showCenterPlay(false);
+    function hideUIElements() {
+      if (!videoEnded) {
+        playlist.classList.remove('active');
+        timeBox.classList.remove('active');
+        muteBtn.classList.remove('active');
+      }
+    }
+
+    wrapper.addEventListener('mousemove', showUIElements);
+    wrapper.addEventListener('touchstart', showUIElements);
+
+    video.addEventListener('play', () => {
+      uiEnabled = true;
+      videoEnded = false;
+      showUIElements();
+    });
+
+    video.addEventListener('ended', () => {
+      videoEnded = true;
+      playlist.classList.add('active');
+      timeBox.classList.add('active');
+      centerPlay.style.display = 'block';
     });
 
     playPause.addEventListener('click', () => {
       if (video.paused) {
         video.play();
         playPause.textContent = 'Pause';
-        showCenterPlay(false);
+        centerPlay.style.display = 'none';
       } else {
         video.pause();
         playPause.textContent = 'Play';
-        showCenterPlay(true);
+        centerPlay.style.display = 'block';
       }
     });
 
-    next.addEventListener('click', () => {
-      video.currentTime += 10;
+    centerPlay.addEventListener('click', () => {
+      video.play();
+      playPause.textContent = 'Pause';
+      centerPlay.style.display = 'none';
     });
 
     video.addEventListener('timeupdate', () => {
-      const percent = (video.currentTime / video.duration) * 100;
+      const current = Math.floor(video.currentTime);
+      const total = Math.floor(video.duration);
+      timeBox.textContent = `${formatTime(current)} - ${formatTime(total)}`;
+      const percent = (current / total) * 100;
       progress.value = percent;
       progress.style.setProperty('--progress', `${percent}%`);
+
+      playlistItems.forEach((item, index) => {
+        const startTime = [0, 30, 60][index];
+        const nextTime = [30, 60, Infinity][index];
+        item.classList.toggle('active', current >= startTime && current < nextTime);
+      });
     });
 
     progress.addEventListener('input', () => {
-      video.currentTime = (progress.value / 100) * video.duration;
-    });
-
-    video.addEventListener('ended', () => {
-      if (autoplay) video.play();
-      else {
-        playPause.textContent = 'Play';
-        showCenterPlay(true);
-      }
-    });
-
-    video.addEventListener('pause', () => {
-      showCenterPlay(true);
-    });
-
-    video.addEventListener('play', () => {
-      showCenterPlay(false);
+      const percent = progress.value;
+      video.currentTime = (percent / 100) * video.duration;
     });
 
     function seekTo(sec) {
       video.currentTime = sec;
       video.play();
       playPause.textContent = 'Pause';
-      showCenterPlay(false);
+      centerPlay.style.display = 'none';
     }
 
-    // ✅ Show play button logo by default on page load
-    showCenterPlay(true);
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      return `${min}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    centerPlay.style.display = 'block';
   </script>
 </body>
 </html>
