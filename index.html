@@ -307,7 +307,8 @@
       videoEnded = true;
       playlist.classList.add('active');
       timeBox.classList.add('active');
-      centerPlay.style.display = 'block';
+      centerPlay.style.display = 'none'; // ✅ Hide center play logo
+      playPause.textContent = 'Play';    // ✅ Switch to Play button
     });
 
     playPause.addEventListener('click', () => {
